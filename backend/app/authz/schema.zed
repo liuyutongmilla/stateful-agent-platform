@@ -1,0 +1,46 @@
+/**
+ * Authorization model for the admin tool surface.
+ *
+ * Roles are relations on an organization; every tool maps to exactly one
+ * permission, so granting a role grants a known, auditable set of tools.
+ * Service-scoped tools are checked against the individual service, which
+ * lets a non-admin maintainer operate only the services they own.
+ */
+
+definition user {}
+
+definition organization {
+    relation owner: user
+    relation admin: user
+    relation operator: user
+    relation auditor: user
+    relation member: user
+
+    permission access = owner + admin + operator + auditor + member
+
+    permission view_users = owner + admin + auditor
+    permission manage_users = owner + admin
+    permission manage_roles = owner
+
+    permission view_flags = owner + admin + operator + auditor
+    permission manage_flags = owner + admin + operator
+
+    permission view_services = owner + admin + operator + auditor
+    permission operate_services = owner + admin + operator
+
+    permission view_incidents = access
+    permission manage_incidents = owner + admin + operator
+
+    permission view_audit = owner + admin + auditor
+    permission view_keys = owner + admin + auditor
+    permission manage_keys = owner + admin
+    permission view_billing = owner + auditor
+}
+
+definition service {
+    relation org: organization
+    relation maintainer: user
+
+    permission view = maintainer + org->view_services
+    permission operate = maintainer + org->operate_services
+}

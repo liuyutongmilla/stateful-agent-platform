@@ -1,0 +1,39 @@
+# Full split deployment: SpiceDB, the MCP tool server, and the agent platform.
+#   cp .env.example .env && docker compose up --build   ->  http://localhost:8000
+services:
+  spicedb:
+    image: authzed/spicedb:v1.45.1
+    command: serve --grpc-preshared-key ${SPICEDB_TOKEN} --datastore-engine memory --telemetry-endpoint=
+    # memory datastore: relationships reset on restart and are re-seeded by the mcp service.
+    # For anything persistent use --datastore-engine postgres.
+
+  mcp:
+    build: .
+    command: python -m app.mcp_server
+    environment:
+      PLATFORM_SECRET: ${PLATFORM_SECRET}
+      SPICEDB_ENDPOINT: spicedb:50051
+      SPICEDB_TOKEN: ${SPICEDB_TOKEN}
+      MCP_ALLOWED_HOSTS: mcp:8001
+    depends_on: [spicedb]
+    restart: on-failure
+
+  app:
+    build:
+      context: .
+      args:
+        EXTRAS: ${APP_EXTRAS:-}   # e.g. APP_EXTRAS=[anthropic] to use a hosted model
+    environment:
+      PLATFORM_SECRET: ${PLATFORM_SECRET}
+      MCP_URL: http://mcp:8001/mcp
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_MODEL: ${LLM_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports: ["8000:8000"]
+    volumes: [state:/data]
+    depends_on: [mcp]
+    restart: on-failure
+
+volumes:
+  state:
